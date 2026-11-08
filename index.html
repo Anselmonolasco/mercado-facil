@@ -284,7 +284,7 @@ function numeros(txt){
   return o.join(' ');
 }
 function parse(txt){
-  const s=numeros(txt).replace(/[.!?]+$/,'').trim();
+  const s=numeros(txt).replace(/\s*v[ií]rgula\s*/gi,',').replace(/[.!?]+$/,'').trim();
   const m=s.match(/(\d+(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?(?:\s+e\s+(\d{1,2}))?(?:\s*centavos)?(?:\s+(?:cada|a unidade|por unidade|a unid))?$/i);
   if(!m)return null;
   const p=parseFloat(m[1].replace(',','.'))+(m[2]?parseInt(m[2],10)/100:0);
@@ -293,39 +293,53 @@ function parse(txt){
   const mq=rest.match(/^(\d+)\s*(?:x|unidades?|un)?\s+(.+)$/i);
   if(mq){q=parseInt(mq[1],10);rest=mq[2];}
   for(let i=0;i<3;i++)rest=rest.replace(/\s+(?:a|por|de|do|da|no|na|custa|custando|valor|preço|preco|e)$/i,'');
-  rest=rest.replace(/[<>&"]/g,'').trim();
+  rest=rest.replace(/[<>&"]/g,'').replace(/[,;:]+$/,'').trim();
   if(!rest||!(p>0)||q<1||q>99)return null;
   return {n:rest.charAt(0).toUpperCase()+rest.slice(1),q:q,u:Math.round(p*100)/100};
 }
 let tAv=0;
-function aviso(m){const e=$('#msg');e.textContent=m;e.style.opacity=1;clearTimeout(tAv);tAv=setTimeout(()=>{e.style.opacity=0},3500);}
+function aviso(m,ms){const e=$('#msg');e.textContent=m;e.style.opacity=1;clearTimeout(tAv);tAv=setTimeout(()=>{e.style.opacity=0},ms||3500);}
 function processar(txt){
   const it=parse(txt);
-  if(!it){aviso('não entendi: “'+txt+'”');return;}
+  if(!it){aviso('não entendi: “'+txt+'”',6000);return;}
   S.itens.push(it);if(total()>S.orc)S.alerta=true;
   render();aviso('adicionado: '+it.q+'x '+it.n+' a '+brl(it.u));
 }
 function marca(on){$('#app').classList.toggle('ouve',on);}
-let rec=null,ouvindo=false;
+let rec=null,ouvindo=false,ultimo='',entregue=false,tSeg=0,dest='compra';
+const proc=t=>dest==='estoque'?processarE(t):processar(t);
+const avs=(m,ms)=>dest==='estoque'?avisoE(m,ms):aviso(m,ms);
+function fim(){clearTimeout(tSeg);ouvindo=false;marca(false);}
+function entregar(){if(entregue)return;const x=ultimo.trim();if(!x)return;entregue=true;proc(x);}
+function terminou(r){if(rec!==r)return;fim();entregar();if(!entregue)avs('não ouvi nada, toque e fale de novo',5000);}
+function parar(r){clearTimeout(tSeg);try{r.stop()}catch(e){}tSeg=setTimeout(()=>terminou(r),2000);}
 const ENTRADA='<div class="cx"><input id="tx" type="text" enterkeyhint="send" autocomplete="off" autocapitalize="off" placeholder="ex.: 2 leite a 5 e 50"><button data-a="env" aria-label="adicionar"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></button></div>';
 function enviar(){const t=$('#tx');if(!t)return;const x=t.value.trim();if(!x)return;processar(x);const n=$('#tx');if(n)n.focus();}
 function digitar(){S.digitar=true;render();aviso('toque no microfone do teclado para falar');const t=$('#tx');if(t)t.focus();}
 $('#mid').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='tx')enviar();});
-function ouvir(){
+function ouvir(d){
+  dest=d||'compra';
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){digitar();return;}
-  if(ouvindo){try{rec.stop()}catch(e){}return;}
-  rec=new SR();rec.lang='pt-BR';rec.interimResults=false;rec.maxAlternatives=1;
-  rec.onstart=()=>{ouvindo=true;marca(true);aviso('ouvindo...');};
-  rec.onresult=e=>{processar(e.results[0][0].transcript);};
-  rec.onerror=e=>{
-    ouvindo=false;marca(false);
-    if(e.error==='not-allowed'||e.error==='service-not-allowed'){aviso('microfone bloqueado neste navegador');digitar();}
-    else if(e.error==='no-speech')aviso('não ouvi nada');
-    else if(e.error!=='aborted')aviso('erro de voz: '+e.error);
+  if(!SR){if(dest==='estoque'){avisoE('use o microfone do teclado');$('#ei').focus();}else digitar();return;}
+  if(ouvindo&&rec){parar(rec);return;}
+  try{if(rec)rec.abort();}catch(e){}
+  const r=new SR();rec=r;ultimo='';entregue=false;
+  r.lang='pt-BR';r.interimResults=true;r.maxAlternatives=1;
+  r.onstart=()=>{ouvindo=true;marca(true);avs('ouvindo... fale agora',10000);clearTimeout(tSeg);tSeg=setTimeout(()=>parar(r),9000);};
+  r.onresult=e=>{
+    ultimo=[...e.results].map(x=>x[0].transcript).join(' ');
+    avs('ouvi: '+ultimo,10000);
+    if(e.results[e.results.length-1].isFinal)entregar();
   };
-  rec.onend=()=>{ouvindo=false;marca(false);};
-  try{rec.start()}catch(e){digitar()}
+  r.onerror=e=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      fim();
+      if(dest==='estoque'){avisoE('microfone bloqueado, use o do teclado');$('#ei').focus();}
+      else{aviso('microfone bloqueado neste navegador');digitar();}
+    }else if(e.error!=='no-speech'&&e.error!=='aborted'){fim();avs('erro de voz: '+e.error,5000);}
+  };
+  r.onend=()=>terminou(r);
+  try{r.start()}catch(e){fim();if(dest==='estoque')$('#ei').focus();else digitar();}
 }
 // ---- cérebro da IA (roda no aparelho, sem custo) ----
 const chv=n=>nk(n).split(' ').slice(0,2).join(' ');
@@ -380,7 +394,7 @@ function renderE(){
   $('#el').innerHTML=L.length?L.map(i=>'<div class="it"><span>'+i.n+'</span><span class="dots"></span><span style="color:'+nvE(i)+';font-weight:500">'+i.q+' un</span></div>').join(''):'<p class="vz">Diga ou digite o que você tem em casa, como “2 leite”.</p>';
 }
 let tE=0;
-function avisoE(m){const e=$('#em');e.textContent=m;e.style.opacity=1;clearTimeout(tE);tE=setTimeout(()=>{e.style.opacity=0},3500);}
+function avisoE(m,ms){const e=$('#em');e.textContent=m;e.style.opacity=1;clearTimeout(tE);tE=setTimeout(()=>{e.style.opacity=0},ms||3500);}
 function processarE(txt){
   const s=numeros(txt).replace(/[.!?]+$/,'').trim();let m,nome='',q=1,modo='add';
   if(m=s.match(/^(?:acabou|acabaram|zerou|zerei)\s+(.+)$/i)){modo='set';q=0;nome=m[1];}
@@ -402,15 +416,7 @@ function processarE(txt){
   salvar();renderE();
 }
 function enviarE(){const t=$('#ei'),x=t.value.trim();if(!x)return;processarE(x);t.value='';t.focus();}
-function ouvirE(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){avisoE('use o microfone do teclado');$('#ei').focus();return;}
-  const r=new SR();r.lang='pt-BR';r.interimResults=false;
-  r.onstart=()=>avisoE('ouvindo...');
-  r.onresult=e=>processarE(e.results[0][0].transcript);
-  r.onerror=e=>{avisoE(e.error==='not-allowed'||e.error==='service-not-allowed'?'microfone bloqueado, use o do teclado':'não ouvi nada');$('#ei').focus();};
-  try{r.start()}catch(e){$('#ei').focus();}
-}
+function ouvirE(){ouvir('estoque');}
 $('#p2').addEventListener('click',e=>{const b=e.target.closest('[data-e]');if(!b)return;const k=b.dataset.e;if(k==='env')enviarE();else if(k==='voz')ouvirE();else avisoE('a foto com IA chega no app instalado');});
 $('#ei').addEventListener('keydown',e=>{if(e.key==='Enter')enviarE();});
 // ---- cupom fiscal ----
