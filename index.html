@@ -109,6 +109,10 @@ button{font-family:inherit;cursor:pointer}
 #ci{height:48px;border:2px solid var(--m);border-radius:24px;padding:0 16px;font-size:16px;font-family:inherit;color:var(--m);background:var(--b);outline:0;margin-top:8px;width:100%}
 .cb{display:flex;justify-content:center;align-items:flex-end;gap:24px;margin-top:16px}
 .cb button{border:0;border-radius:50%;display:flex;align-items:center;justify-content:center}
+#ed{position:absolute;inset:0;background:var(--b);z-index:8;transform:translateY(100%);transition:transform .28s ease;display:flex;flex-direction:column;justify-content:center;padding:24px;text-align:left}
+#ed.on{transform:none}
+#ed .rvt{text-align:center;margin-bottom:8px}
+#ed input{height:48px;border:2px solid var(--m);border-radius:24px;padding:0 16px;font-size:16px;font-family:inherit;color:var(--m);background:var(--b);outline:0;width:100%}
 .ouve .mic::after{animation-duration:.9s}
 .cx{display:flex;align-items:center;gap:10px;width:100%;animation:pop .3s ease-out}
 .cx input{flex:1;min-width:0;height:56px;border:2px solid var(--m);border-radius:28px;padding:0 20px;font-size:16px;font-family:inherit;color:var(--m);background:var(--b);outline:0}
@@ -138,6 +142,7 @@ button{font-family:inherit;cursor:pointer}
   </div>
   <div id="gest"><svg width="22" height="10" viewBox="0 0 22 10" fill="none" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".45"><path d="M2 8l9-6 9 6"/></svg><i></i></div>
   <div id="cp"><div class="rvt">cupom fiscal</div><div class="rvn" id="cpt"></div><div id="cpb" style="height:4px;margin:8px 0 6px"></div><div class="cmp" id="cpm"></div><div class="cpr">preço unitário e variação desde a última compra</div><div id="cpi"></div><div class="aviso" id="ca" style="text-align:center"></div><input id="ci" type="text" enterkeyhint="send" autocomplete="off" autocapitalize="off" placeholder="corrigir ou incluir: leite 5,95"><div class="cb"><button id="cf" style="width:56px;height:56px;background:var(--s)" aria-label="foto do cupom"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 8h2l1.5-2h7L17 8h2a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg></button><button id="cs" style="width:72px;height:72px;background:var(--m)" aria-label="salvar"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></button></div></div>
+  <div id="ed"><div class="rvt">editar item</div><div class="cpr">quantidade</div><input id="eq" inputmode="numeric" autocomplete="off"><div class="cpr">produto</div><input id="en" autocomplete="off"><div class="cpr">valor unitário (R$)</div><input id="eu" inputmode="decimal" autocomplete="off"><div class="cb" style="margin-top:28px"><button id="ek" style="width:56px;height:56px;background:var(--s)" aria-label="cancelar"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><button id="eo" style="width:72px;height:72px;background:var(--m)" aria-label="salvar"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></button><button id="ex" style="width:56px;height:56px;background:var(--s)" aria-label="remover"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></svg></button></div></div>
   <div id="rv"><div id="rvc"></div></div>
   <div id="lat">
     <svg id="sv"><path id="pth" fill="#1E293B"/></svg>
@@ -170,7 +175,7 @@ function render(){salvar();
   const sg=S.alerta?sug():null;
   c.classList.toggle('exp',S.exp&&!sg);
   $('#mid').innerHTML=sg?card(sg.texto):(S.digitar?ENTRADA:MIC);
-  $('#itens').innerHTML=S.itens.map((i,k)=>'<div class="it'+(novoIt&&k===S.itens.length-1?' novo':'')+'"><span>'+i.q+'x '+i.n+'</span><span class="dots"></span><span>'+brl(t(i))+'</span></div>').join('');
+  $('#itens').innerHTML=S.itens.map((i,k)=>'<div class="it'+(novoIt&&k===S.itens.length-1?' novo':'')+'" data-i="'+k+'"><span>'+i.q+'x '+i.n+'</span><span class="dots"></span><span>'+brl(t(i))+'</span></div>').join('');
   $('#itens').scrollTop=1e6;
 }
 $('#ini').onclick=()=>{S.comprando=true;render();const c=$('#compras');c.classList.remove('entra');void c.offsetWidth;c.classList.add('entra');};
@@ -284,7 +289,7 @@ function numeros(txt){
   return o.join(' ');
 }
 function parse(txt){
-  const s=numeros(txt).replace(/\s*v[ií]rgula\s*/gi,',').replace(/[.!?]+$/,'').trim();
+  const s=numeros(txt).replace(timeRe,'$1,$2').replace(/\s*v[ií]rgula\s*/gi,',').replace(/[.!?]+$/,'').trim();
   const m=s.match(/(\d+(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?(?:\s+e\s+(\d{1,2}))?(?:\s*centavos)?(?:\s+(?:cada|a unidade|por unidade|a unid))?$/i);
   if(!m)return null;
   const p=parseFloat(m[1].replace(',','.'))+(m[2]?parseInt(m[2],10)/100:0);
@@ -300,6 +305,7 @@ function parse(txt){
 let tAv=0;
 function aviso(m,ms){const e=$('#msg');e.textContent=m;e.style.opacity=1;clearTimeout(tAv);tAv=setTimeout(()=>{e.style.opacity=0},ms||3500);}
 function processar(txt){
+  if(comandoC(txt))return;
   const it=parse(txt);
   if(!it){aviso('não entendi: “'+txt+'”',6000);return;}
   S.itens.push(it);if(total()>S.orc)S.alerta=true;
@@ -327,6 +333,7 @@ function ouvir(d){
   r.lang='pt-BR';r.interimResults=true;r.maxAlternatives=1;
   r.onstart=()=>{ouvindo=true;marca(true);avs('ouvindo... fale agora',10000);clearTimeout(tSeg);tSeg=setTimeout(()=>parar(r),9000);};
   r.onresult=e=>{
+    if(r!==rec)return;
     ultimo=[...e.results].map(x=>x[0].transcript).join(' ');
     avs('ouvi: '+ultimo,10000);
     if(e.results[e.results.length-1].isFinal){entregar();fim();rec=null;try{r.stop();}catch(x){}}
@@ -465,6 +472,41 @@ function salvarCompra(){
 $('#cs').onclick=salvarCompra;
 $('#cf').onclick=()=>avisoC('a foto do cupom chega no app instalado');
 $('#ci').addEventListener('keydown',e=>{if(e.key==='Enter'){const x=e.target.value.trim();if(x){aplicarC(x);e.target.value='';}}});
+// ---- correções ----
+const timeRe=/(\d+)\s*(?:horas?|h|:)\s*(?:e\s*)?(\d{1,2})\s*(?:minutos?|min)?/gi;
+function preco(v){const m=v.match(/^(\d+(?:[.,]\d{1,2})?)(?:\s*(?:reais|real))?(?:\s+e\s+(\d{1,2}))?(?:\s*centavos)?$/);return m?parseFloat(m[1].replace(',','.'))+(m[2]?parseInt(m[2],10)/100:0):NaN;}
+function acharI(nome){const k=nk(nome).replace(/s$/,'');if(!k)return null;return [...S.itens].reverse().find(i=>{const n=nk(i.n);return n.includes(k)||k.includes(n);})||null;}
+function comandoC(txt){
+  const s=numeros(txt).replace(timeRe,'$1,$2').replace(/\s*v[ií]rgula\s*/gi,',').replace(/[.!?]+$/,'').trim(),ns=nk(s);let m;
+  const feito=msg=>{S.alerta=total()>S.orc;render();aviso(msg,5000);return true;};
+  if(/^(?:desfazer|desfaz|voltar)$/.test(ns)||/^(?:remover|remove|tirar|tira|apagar|apaga|excluir|exclui)\s+(?:o\s+|a\s+)?ultim[oa](?:\s+item)?$/.test(ns)){
+    const x=S.itens.pop();if(!x){aviso('a lista está vazia');return true;}
+    return feito('removido: '+x.q+'x '+x.n);
+  }
+  if(!/\d\s*(?:reais|real|centavos)?\s*$/.test(ns)&&(m=ns.match(/^(?:remover|remove|tirar|tira|apagar|apaga|excluir|exclui)\s+(?:o\s+|a\s+|os\s+|as\s+)?(.+)$/))){
+    const x=acharI(m[1]);if(!x){aviso('não achei “'+m[1]+'” na lista',5000);return true;}
+    S.itens.splice(S.itens.indexOf(x),1);return feito('removido: '+x.q+'x '+x.n);
+  }
+  if(m=ns.match(/^(?:corrigir|corrige|alterar|altera|mudar|muda|trocar|troca)\s+(?:o\s+|a\s+)?(?:(quantidade|preco|valor)\s+(?:do\s+|da\s+|de\s+)?)?(.+?)\s+(?:para|pra|por)\s+(.+)$/)){
+    const x=acharI(m[2]);if(!x){aviso('não achei “'+m[2]+'” na lista',5000);return true;}
+    if(m[1]==='quantidade'){const q=parseInt(m[3],10);if(!(q>=1&&q<=99)){aviso('não entendi a quantidade',5000);return true;}x.q=q;}
+    else{const p=preco(m[3]);if(!(p>0)){aviso('não entendi o valor',5000);return true;}x.u=Math.round(p*100)/100;}
+    return feito('corrigido: '+x.q+'x '+x.n+' a '+brl(x.u));
+  }
+  return false;
+}
+let EDI=-1;
+function abrirEd(i){const x=S.itens[i];if(!x)return;EDI=i;$('#eq').value=x.q;$('#en').value=x.n;$('#eu').value=x.u.toFixed(2).replace('.',',');$('#ed').classList.add('on');}
+function fecharEd(){$('#ed').classList.remove('on');EDI=-1;}
+function salvarEd(){
+  const x=S.itens[EDI];if(!x){fecharEd();return;}
+  const q=parseInt($('#eq').value,10),u=parseFloat($('#eu').value.replace(',','.')),n=$('#en').value.replace(/[<>&"]/g,'').trim();
+  if(!(q>=1&&q<=99)||!(u>0)||!n)return;
+  x.q=q;x.u=Math.round(u*100)/100;x.n=cap(n);S.alerta=total()>S.orc;fecharEd();render();
+}
+function removerEd(){if(S.itens[EDI]){S.itens.splice(EDI,1);S.alerta=total()>S.orc;}fecharEd();render();}
+$('#itens').addEventListener('click',e=>{const r=e.target.closest('.it');if(r)abrirEd(+r.dataset.i);});
+$('#ek').onclick=fecharEd;$('#eo').onclick=salvarEd;$('#ex').onclick=removerEd;
 let shown=0,raf=0,lastLen=0,prevOver=false;
 function contar(to){
   cancelAnimationFrame(raf);
