@@ -311,7 +311,7 @@ const proc=t=>dest==='estoque'?processarE(t):processar(t);
 const avs=(m,ms)=>dest==='estoque'?avisoE(m,ms):aviso(m,ms);
 function fim(){clearTimeout(tSeg);ouvindo=false;marca(false);}
 function entregar(){if(entregue)return;const x=ultimo.trim();if(!x)return;entregue=true;proc(x);}
-function terminou(r){if(rec!==r)return;fim();entregar();if(!entregue)avs('não ouvi nada, toque e fale de novo',5000);}
+function terminou(r){if(rec!==r)return;fim();rec=null;entregar();if(!entregue)avs('não ouvi nada, toque e fale de novo',5000);}
 function parar(r){clearTimeout(tSeg);try{r.stop()}catch(e){}tSeg=setTimeout(()=>terminou(r),2000);}
 const ENTRADA='<div class="cx"><input id="tx" type="text" enterkeyhint="send" autocomplete="off" autocapitalize="off" placeholder="ex.: 2 leite a 5 e 50"><button data-a="env" aria-label="adicionar"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F8FAFC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg></button></div>';
 function enviar(){const t=$('#tx');if(!t)return;const x=t.value.trim();if(!x)return;processar(x);const n=$('#tx');if(n)n.focus();}
@@ -322,21 +322,22 @@ function ouvir(d){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){if(dest==='estoque'){avisoE('use o microfone do teclado');$('#ei').focus();}else digitar();return;}
   if(ouvindo&&rec){parar(rec);return;}
-  try{if(rec)rec.abort();}catch(e){}
+  if(rec){try{rec.abort();}catch(e){}rec=null;}
   const r=new SR();rec=r;ultimo='';entregue=false;
   r.lang='pt-BR';r.interimResults=true;r.maxAlternatives=1;
   r.onstart=()=>{ouvindo=true;marca(true);avs('ouvindo... fale agora',10000);clearTimeout(tSeg);tSeg=setTimeout(()=>parar(r),9000);};
   r.onresult=e=>{
     ultimo=[...e.results].map(x=>x[0].transcript).join(' ');
     avs('ouvi: '+ultimo,10000);
-    if(e.results[e.results.length-1].isFinal)entregar();
+    if(e.results[e.results.length-1].isFinal){entregar();fim();rec=null;try{r.stop();}catch(x){}}
   };
   r.onerror=e=>{
+    if(r!==rec)return;
     if(e.error==='not-allowed'||e.error==='service-not-allowed'){
       fim();
       if(dest==='estoque'){avisoE('microfone bloqueado, use o do teclado');$('#ei').focus();}
       else{aviso('microfone bloqueado neste navegador');digitar();}
-    }else if(e.error!=='no-speech'&&e.error!=='aborted'){fim();avs('erro de voz: '+e.error,5000);}
+    }else if(e.error!=='no-speech'){fim();rec=null;avs(e.error==='aborted'?'não deu certo, toque de novo':'erro de voz: '+e.error,5000);}
   };
   r.onend=()=>terminou(r);
   try{r.start()}catch(e){fim();if(dest==='estoque')$('#ei').focus();else digitar();}
